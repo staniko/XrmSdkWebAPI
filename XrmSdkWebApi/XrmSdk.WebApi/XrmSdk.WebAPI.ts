@@ -1472,9 +1472,10 @@ module XrmSdk.WebAPI {
     }
 
     export function isStringArray(obj) {
-        if (this.isArray(obj)) {
+        const self = this;
+        if (self.isArray(obj)) {
             obj.forEach(function (item) {
-                if (!this.isString(item)) {
+                if (!self.isString(item)) {
                     return false;
                 }
             });
