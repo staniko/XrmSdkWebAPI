@@ -80,13 +80,11 @@ module XrmSdk.WebAPI {
         }
     }
 
-    export function retrieve(uri: string, properties: [string], navigationproperties: [string], successCallback: (data: Entity) => void, errorCallback: (error: Error) => void, includeFormattedValues: boolean, eTag: string, unmodifiedCallback: () => void, callerId: string, async: boolean) {
+    export function retrieve(uri: string, properties: [string], navigationproperties: [string], includeFormattedValues: boolean, eTag: string, unmodifiedCallback: () => void, callerId: string, async: boolean) : Promise<any> {
         /// <summary>Retrieve an entity</summary>
         /// <param name="uri" type="String">The Uri for the entity you want to retrieve</param>
         /// <param name="properties" type="Array">An array of strings representing the entity properties you want to retrieve.</param>
         /// <param name="navigationproperties" type="String">An array of strings representing the navigation properties and any system query options you want to retrieve.</param>
-        /// <param name="successCallback" type="Function">The function to call when the entity is retrieved. The entity data will be passed to this function.</param>
-        /// <param name="errorCallback" type="Function">The function to call when there is an error. The error will be passed to this function.</param>
         /// <param name="includeFormattedValues" type="Boolean" optional="true">Whether you want to return formatted values.</param>
         /// <param name="eTag" type="String" optional="true">When provided and the entity has not been modified since the eTag value was retrieved, the unmodifiedCallback will be called.</param>
         /// <param name="unmodifiedCallback" type="Function" optional="true">The function to call when the entity has not been modified since last retrieved based on the eTag value. No entity data will be passed to this function.</param>
@@ -100,12 +98,6 @@ module XrmSdk.WebAPI {
         }
         if (!this.isStringArrayOrNull(navigationproperties)) {
             throw new Error("XrmSdk.WebAPI.retrieve navigationproperties parameter must be an array of strings or null.");
-        }
-        if (!this.isFunctionOrNull(successCallback)) {
-            throw new Error("XrmSdk.WebAPI.retrieve successCallback parameter must be a function or null.");
-        }
-        if (!this.isFunctionOrNull(errorCallback)) {
-            throw new Error("XrmSdk.WebAPI.retrieve errorCallback parameter must be a function or null.");
         }
         if (!this.isBooleanOrNullOrUndefined(includeFormattedValues)) {
             throw new Error("XrmSdk.WebAPI.retrieve includeFormattedValues parameter must be a boolean, null, or undefined.");
@@ -155,44 +147,42 @@ module XrmSdk.WebAPI {
         }
 
         if (async) {
-            req.onreadystatechange = function () {
-                if (this.readyState == 4 /* complete */) {
-                    req.onreadystatechange = null;
-                    switch (this.status) {
-                        case 200:
-                            if (successCallback)
-                                successCallback(JSON.parse(this.response, this.dateReviver));
-                            break;
-                        case 304: //Not modified
-                            if (this.isFunction(unmodifiedCallback))
+            return new Promise<void>((resolve, reject) => {
+                req.onreadystatechange = function () {
+                    if (this.readyState === 4 /* complete */) {
+                        req.onreadystatechange = null;
+                        if (this.status === 200) {
+                            resolve(JSON.parse(this.response, this.dateReviver));
+                        }
+                        if (this.status === 304) {
+                            if (WebAPI.isFunction(unmodifiedCallback)) {
                                 unmodifiedCallback();
-                            break;
-                        default:
-                            if (errorCallback)
-                                errorCallback(this.errorHandler(this));
-                            break;
+                            }
+                        } else {
+                            reject(WebAPI.errorHandler(this));
+                        }
                     }
-                }
-            };
-            req.send();
+                };
+                req.send();
+            });
         } else {
-            req.send();
-            switch (req.status) {
+            var deferred = new Promise<void>((resolve, reject) => {
+                req.send();
+                switch (req.status) {
                 case 200:
-                    if (successCallback)
-                        successCallback(JSON.parse(req.response, this.dateReviver));
+                    resolve(JSON.parse(req.response, this.dateReviver));
                     break;
                 case 304: //Not modified
                     if (this.isFunction(unmodifiedCallback))
                         unmodifiedCallback();
                     break;
                 default:
-                    if (errorCallback)
-                        errorCallback(this.errorHandler(this));
+                    reject(this.errorHandler(this));
                     break;
-            }
+                }
+            });
+            return deferred;
         }
-
     }
 
     export function retrievePropertyValue(uri: string, propertyName: string, successCallback: (value: any) => void, errorCallback: (error: Error) => void, callerId: string, async: boolean) {
